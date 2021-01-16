@@ -25,7 +25,8 @@ namespace Ensemble
     let started = 0;
     let onReceivedValueHandler: (name: string, value: number) => void;
     let identify = 0;
-    
+    let rxBuffer = "";
+
     export let isGateway:boolean = false;
     
     function sendPacket(msgType:number, id:number, value:number, name:string)
@@ -58,7 +59,7 @@ namespace Ensemble
 
     control.inBackground(function ()
     {
-        let zz = 0;
+        let zz = 1;
         let list = [];
 
         while(true)
@@ -157,10 +158,12 @@ namespace Ensemble
         }
     })
 
-    serial.onDataReceived(serial.delimiters(Delimiters.NewLine), function () 
+    function parseCommand(buff : string)
     {
-        let buff = serial.readLine();
         let toks = buff.split("|");
+       // basic.showNumber(toks.length);
+
+//       return;
         if (toks.length >= 4)
         {
             let msgType = parseInt(toks[0]);
@@ -169,7 +172,6 @@ namespace Ensemble
                 case MSG_TYPE_YOU_ARE_GATEWAY:
                     if (!isGateway)
                     {
-                        serial.setRxBufferSize(64);
                         isGateway = true;
                     }
                     break;
@@ -213,8 +215,38 @@ namespace Ensemble
                     break;
             }
         }
-    })
+    }
 
+    //serial.onDataReceived(serial.delimiters(Delimiters.Hash), function () 
+    //{
+       // led.toggleAll();
+//        let buff = serial.readString();//.readUntil(serial.delimiters(Delimiters.Hash));
+      //  return;
+  //    parseCommand(buff);
+    //});
+
+    serial.onDataReceived(serial.delimiters(Delimiters.Hash), function () 
+    {
+        let rx = serial.readString();
+       // serial.writeLine("rx " + rx.length);
+        for(let i = 0; i < rx.length; i++)
+        {
+            let c = rx.charAt(i);
+            if (c == '#')
+            {
+                parseCommand(rxBuffer);
+                rxBuffer = "";
+            }
+            else if (rxBuffer.length < 30)
+            {
+                rxBuffer = rxBuffer + c;
+            }
+            else
+            {
+                rxBuffer = "";
+            }
+        }
+    })
 
    /**
      * Registers code to run when the radio receives a value from Ensemble
@@ -279,6 +311,9 @@ namespace Ensemble
         started = 1;
         radio.setGroup(1);
         radio.setTransmitSerialNumber(true);
+        serial.setTxBufferSize(128);
+        serial.setRxBufferSize(64);
+        serial.readString();
         sendId();
     }
 
